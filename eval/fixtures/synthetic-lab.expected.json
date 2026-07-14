@@ -1,0 +1,11 @@
+{
+  "lab_name": "Synthetic Diagnostics (demo)",
+  "collected_at": "2026-03-12",
+  "results": [
+    { "code": "hba1c", "value": 5.4, "ref_low": 4.0, "ref_high": 5.6, "flag": "normal" },
+    { "code": "ldl", "value": 165, "ref_high": 100, "flag": "high" },
+    { "code": "alt", "value": 55, "ref_low": 0, "ref_high": 40, "flag": "high" },
+    { "code": "vitamin_d", "value": 20.05, "flag": null },
+    { "code": null, "value": null }
+  ]
+}

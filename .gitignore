@@ -9,3 +9,8 @@ next-env.d.ts
 
 # Local Claude Code / editor config
 .claude/
+
+# Eval golden set — real health data. NEVER commit. (fixtures/ is synthetic, kept)
+eval/pdfs/
+eval/expected/
+eval/cache/

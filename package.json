@@ -7,14 +7,19 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test:rls": "node --import tsx test/rls.test.ts"
+    "test:rls": "node --import tsx test/rls.test.ts",
+    "eval": "node --import tsx eval/run.ts",
+    "gen:seed": "node --import tsx scripts/gen-seed.ts"
   },
   "dependencies": {
+    "@google/genai": "^0.14.0",
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.45.4",
+    "groq-sdk": "^0.9.1",
     "next": "^15.0.3",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "unpdf": "^0.12.1"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

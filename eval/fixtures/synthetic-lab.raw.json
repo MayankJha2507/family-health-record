@@ -1,0 +1,12 @@
+{
+  "lab_name": "Synthetic Diagnostics (demo)",
+  "collected_at": "2026-03-12",
+  "reported_at": "2026-03-13",
+  "results": [
+    { "name": "HbA1c", "value": "5.4", "unit": "%", "ref_low": 4.0, "ref_high": 5.6, "ref_text": null, "page": 1 },
+    { "name": "LDL Cholesterol", "value": "165", "unit": "mg/dL", "ref_low": null, "ref_high": 100, "ref_text": "<100", "page": 1 },
+    { "name": "SGPT", "value": "55", "unit": "U/L", "ref_low": 0, "ref_high": 40, "ref_text": null, "page": 1 },
+    { "name": "Vitamin D (25-OH)", "value": "50", "unit": "nmol/L", "ref_low": null, "ref_high": null, "ref_text": "30-100 ng/mL", "page": 1 },
+    { "name": "Some Novel Marker", "value": "12", "unit": "xyz", "ref_low": null, "ref_high": null, "ref_text": null, "page": 1 }
+  ]
+}
