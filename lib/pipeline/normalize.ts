@@ -10,7 +10,7 @@
 import {
   BIOMARKERS,
   UNIT_CONVERSIONS,
-  matchBiomarker,
+  resolveBiomarker,
   normalizeName,
   type Biomarker,
 } from '../biomarkers/dictionary';
@@ -24,6 +24,32 @@ export function parseValue(printed: string): number | null {
   const cleaned = printed.replace(/,/g, '').trim();
   const m = cleaned.match(/^-?\d+(\.\d+)?$/);
   return m ? Number(cleaned) : null;
+}
+
+/**
+ * Parse a single-bound or numeric-pair reference range out of printed range
+ * text into usable bounds, so we can flag against ranges the lab prints as
+ * "< 200" rather than a low/high pair. Anchored to the WHOLE string (^…$) so a
+ * descriptive block like "Below 5.7% : Normal, 5.7% - 6.4% : Prediabetic" is
+ * deliberately NOT parsed — matching that would produce a wrong bound.
+ */
+export function parseRefText(
+  refText: string | null,
+): { ref_low: number | null; ref_high: number | null } | null {
+  if (!refText) return null;
+  const s = refText.trim();
+  const unit = '[a-zA-Z/%µ.]*'; // an optional trailing unit like "mg/dL" or "Ratio"
+  let m: RegExpMatchArray | null;
+  if ((m = s.match(new RegExp(`^<\\s*=?\\s*([\\d.]+)\\s*${unit}$`)))) {
+    return { ref_low: null, ref_high: Number(m[1]) };
+  }
+  if ((m = s.match(new RegExp(`^>\\s*=?\\s*([\\d.]+)\\s*${unit}$`)))) {
+    return { ref_low: Number(m[1]), ref_high: null };
+  }
+  if ((m = s.match(new RegExp(`^([\\d.]+)\\s*[-–]\\s*([\\d.]+)\\s*${unit}$`)))) {
+    return { ref_low: Number(m[1]), ref_high: Number(m[2]) };
+  }
+  return null;
 }
 
 /** Convert a value to the biomarker's canonical unit. Returns [value, unit]. */
@@ -64,8 +90,23 @@ function round(n: number): number {
 
 export function normalizeResult(raw: RawResult): NormalizedResult {
   const warnings: string[] = [];
-  const bm = matchBiomarker(raw.name);
+  const match = resolveBiomarker(raw.name);
+  const bm = match.biomarker;
   const value = parseValue(raw.value);
+
+  // Audit trail for the suffix-stripping fallback (see resolveBiomarker).
+  if (match.via === 'suffix-strip') {
+    warnings.push(
+      `matched by stripping method suffix "- ${match.strippedSuffix}" from "${raw.name}" → ${bm!.code} ` +
+        `(audit: treated as same analyte, different method)`,
+    );
+  }
+  if (match.ambiguousSuffix) {
+    warnings.push(
+      `suffix "- ${match.ambiguousSuffix}" NOT stripped from "${raw.name}" — may be a distinct measurement; ` +
+        `left unmatched for review`,
+    );
+  }
 
   let canonical_value: number | null = null;
   let canonical_unit: string | null = null;
@@ -88,11 +129,24 @@ export function normalizeResult(raw: RawResult): NormalizedResult {
     warnings.push(`non-numeric value "${raw.value}" — not trended; verify or enter manually`);
   }
 
-  if (!bm) {
+  if (!bm && !match.ambiguousSuffix) {
     warnings.push('analyte not in dictionary — stored raw, not trended');
   }
 
-  const flag = computeFlag(value, raw.ref_low, raw.ref_high);
+  // Effective reference bounds: prefer the lab's printed numeric pair; otherwise
+  // parse a single-bound/pair range out of ref_text so flagging still works.
+  let refLow = raw.ref_low;
+  let refHigh = raw.ref_high;
+  if (refLow == null && refHigh == null && raw.ref_text) {
+    const parsed = parseRefText(raw.ref_text);
+    if (parsed) {
+      refLow = parsed.ref_low;
+      refHigh = parsed.ref_high;
+      warnings.push(`reference range parsed from text "${raw.ref_text}" → low=${refLow}, high=${refHigh}`);
+    }
+  }
+
+  const flag = computeFlag(value, refLow, refHigh);
 
   return {
     biomarker_id: bm?.code ?? null,
@@ -101,8 +155,8 @@ export function normalizeResult(raw: RawResult): NormalizedResult {
     unit: raw.unit,
     canonical_value,
     canonical_unit,
-    ref_low: raw.ref_low,
-    ref_high: raw.ref_high,
+    ref_low: refLow,
+    ref_high: refHigh,
     ref_text: raw.ref_text,
     flag,
     page: raw.page,

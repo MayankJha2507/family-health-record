@@ -102,9 +102,9 @@ export const BIOMARKERS: Biomarker[] = [
   { code: 'total_cholesterol', display_name: 'Total Cholesterol', category: 'Lipid', canonical_unit: 'mg/dL',
     aliases: ['total cholesterol', 'cholesterol total', 'cholesterol', 'serum cholesterol'], sanity: { min: 50, max: 600 } },
   { code: 'hdl', display_name: 'HDL Cholesterol', category: 'Lipid', canonical_unit: 'mg/dL',
-    aliases: ['hdl', 'hdl cholesterol', 'hdl - cholesterol', 'high density lipoprotein'], sanity: { min: 5, max: 150 } },
+    aliases: ['hdl', 'hdl cholesterol', 'hdl - cholesterol', 'hdl cholesterol - direct', 'high density lipoprotein'], sanity: { min: 5, max: 150 } },
   { code: 'ldl', display_name: 'LDL Cholesterol', category: 'Lipid', canonical_unit: 'mg/dL',
-    aliases: ['ldl', 'ldl cholesterol', 'ldl - cholesterol', 'low density lipoprotein'], sanity: { min: 5, max: 400 } },
+    aliases: ['ldl', 'ldl cholesterol', 'ldl - cholesterol', 'ldl cholesterol - direct', 'low density lipoprotein'], sanity: { min: 5, max: 400 } },
   { code: 'vldl', display_name: 'VLDL Cholesterol', category: 'Lipid', canonical_unit: 'mg/dL',
     aliases: ['vldl', 'vldl cholesterol'], sanity: { min: 1, max: 200 } },
   { code: 'triglycerides', display_name: 'Triglycerides', category: 'Lipid', canonical_unit: 'mg/dL',
@@ -224,6 +224,65 @@ for (const b of BIOMARKERS) {
 /** Resolve a lab-printed analyte name to a canonical biomarker, or null. */
 export function matchBiomarker(rawName: string): Biomarker | null {
   return ALIAS_INDEX.get(normalizeName(rawName)) ?? null;
+}
+
+/**
+ * Trailing suffixes that denote a measurement METHOD (not a different analyte),
+ * safe to ignore when an exact alias match fails. Kept deliberately small.
+ */
+const METHOD_SUFFIXES = new Set([
+  'direct',      // e.g. "LDL Cholesterol - Direct" (direct assay vs. calculated)
+  'indirect',    // a method for some analytes — but a DISTINCT fraction for others
+  'calculated',  // (see DISTINCT_FRACTION_ROOTS guard below)
+  'measured',
+  'photometry',
+  'serum',
+  'plasma',
+]);
+
+/**
+ * Analyte roots where "direct"/"indirect" name a DISTINCT fraction, not a
+ * method — merging them would fuse two genuinely different measurements. For
+ * these we refuse to strip and surface the name for human review instead.
+ * GROW THIS LIST whenever a new distinct-fraction analyte is added.
+ */
+const DISTINCT_FRACTION_ROOTS = ['bilirubin'];
+
+export interface MatchResult {
+  biomarker: Biomarker | null;
+  via: 'exact' | 'suffix-strip' | 'none';
+  /** The method suffix that was stripped to reach a match (for auditing). */
+  strippedSuffix?: string;
+  /** A suffix deliberately NOT stripped because it may mean a distinct analyte. */
+  ambiguousSuffix?: string;
+}
+
+/**
+ * Like matchBiomarker, but with conservative, AUDITABLE method-suffix stripping
+ * as a fallback. Never strips a direct/indirect suffix off a distinct-fraction
+ * analyte (e.g. bilirubin) — it flags those instead so nothing silently merges.
+ */
+export function resolveBiomarker(rawName: string): MatchResult {
+  const norm = normalizeName(rawName);
+  const exact = ALIAS_INDEX.get(norm);
+  if (exact) return { biomarker: exact, via: 'exact' };
+
+  // Try stripping exactly one trailing " - <word>" suffix.
+  const m = norm.match(/^(.+?)\s*-\s*([a-z]+)$/);
+  if (m) {
+    const base = m[1].trim();
+    const suffix = m[2];
+    if (METHOD_SUFFIXES.has(suffix)) {
+      const rootIsDistinct = DISTINCT_FRACTION_ROOTS.some((r) => base.includes(r));
+      if (rootIsDistinct && (suffix === 'direct' || suffix === 'indirect')) {
+        // e.g. "bilirubin - indirect": a distinct analyte. Do NOT merge.
+        return { biomarker: null, via: 'none', ambiguousSuffix: suffix };
+      }
+      const baseMatch = ALIAS_INDEX.get(normalizeName(base));
+      if (baseMatch) return { biomarker: baseMatch, via: 'suffix-strip', strippedSuffix: suffix };
+    }
+  }
+  return { biomarker: null, via: 'none' };
 }
 
 export function getBiomarker(code: string): Biomarker | undefined {

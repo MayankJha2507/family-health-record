@@ -148,6 +148,7 @@ interface CaseReport {
   tally: FieldTally;
   misses: string[]; // expected codes not found
   extras: string[]; // known-code results extracted but not expected
+  audit: string[]; // suffix-strip / ambiguous-suffix decisions, for human review
   resultsCorrect: number; // matched code AND correct value
   resultsExpected: number;
 }
@@ -190,12 +191,19 @@ function evaluate(name: string, kind: string, expected: Expected, results: Norma
   // lab_name / collected_at live on the raw extraction and are folded in at the
   // document level in main() — not here.
 
+  // Audit: surface every suffix-strip merge and every deliberately-unmerged
+  // ambiguous suffix, so a human can confirm we never fused distinct analytes.
+  const audit = results
+    .flatMap((r) => r.warnings)
+    .filter((w) => w.includes('method suffix') || w.includes('NOT stripped'));
+
   return {
     name, kind,
     route: notes,
     tally,
     misses,
     extras,
+    audit,
     resultsCorrect,
     resultsExpected: [...expectedCodes].length,
   };
@@ -307,6 +315,7 @@ async function main() {
     console.log(`    lab_name ${docLab ? '✓' : '✗'}   collected_at ${docDate ? '✓' : '✗'}`);
     if (report.misses.length) console.log(`    MISSED: ${report.misses.join(', ')}`);
     if (report.extras.length) console.log(`    EXTRA (false positive): ${report.extras.join(', ')}`);
+    for (const a of report.audit) console.log(`    AUDIT: ${a}`);
     console.log();
   }
 
