@@ -23,6 +23,13 @@ export type Category =
   | 'Iron'
   | 'Inflammation';
 
+/**
+ * Which direction of change is desirable for this marker — used ONLY to colour a
+ * change good/bad in the UI, never to diagnose. "in-band-better" means being
+ * inside the reference range is what's good (either extreme is worse).
+ */
+export type Direction = 'higher-better' | 'lower-better' | 'in-band-better';
+
 export interface Biomarker {
   code: string;
   display_name: string;
@@ -37,6 +44,10 @@ export interface Biomarker {
    * silently dropped or auto-committed.
    */
   sanity?: { min: number; max: number };
+  /** Desirable direction of change (populated below). */
+  direction?: Direction;
+  /** Whether this is a "core" marker that surfaces prominently. */
+  core?: boolean;
 }
 
 /**
@@ -204,6 +215,43 @@ export const BIOMARKERS: Biomarker[] = [
   { code: 'crp', display_name: 'C-Reactive Protein (CRP)', category: 'Inflammation', canonical_unit: 'mg/L',
     aliases: ['crp', 'c-reactive protein', 'c reactive protein', 'crp quantitative'], sanity: { min: 0, max: 500 } },
 ];
+
+/**
+ * Desirable direction of change per marker (for GOOD/BAD colouring only, never a
+ * diagnosis). Anything not listed defaults to 'in-band-better'.
+ */
+const DIRECTION: Record<string, Direction> = {
+  // lower is better
+  total_cholesterol: 'lower-better', ldl: 'lower-better', vldl: 'lower-better',
+  triglycerides: 'lower-better', non_hdl: 'lower-better',
+  hba1c: 'lower-better', glucose_fasting: 'lower-better', glucose_pp: 'lower-better',
+  glucose_random: 'lower-better', insulin_fasting: 'lower-better',
+  alt: 'lower-better', ast: 'lower-better', alp: 'lower-better', ggt: 'lower-better',
+  bilirubin_total: 'lower-better', bilirubin_direct: 'lower-better', bilirubin_indirect: 'lower-better',
+  urea: 'lower-better', bun: 'lower-better', creatinine: 'lower-better', uric_acid: 'lower-better',
+  crp: 'lower-better', esr: 'lower-better', rdw: 'lower-better',
+  // higher is better
+  hdl: 'higher-better', egfr: 'higher-better', albumin: 'higher-better',
+  vitamin_d: 'higher-better', vitamin_b12: 'higher-better', folate: 'higher-better',
+  // everything else: in-band-better (electrolytes, thyroid, CBC indices, iron studies…)
+};
+
+/** Core markers that surface prominently (HbA1c, lipids, key LFT/KFT, TSH, Vit D, B12, Hb). */
+const CORE_CODES = new Set([
+  'hba1c', 'total_cholesterol', 'hdl', 'ldl', 'triglycerides',
+  'alt', 'ast', 'creatinine', 'urea', 'tsh', 'vitamin_d', 'vitamin_b12', 'hemoglobin',
+]);
+
+/** Panel display order (matches how Indian lab reports group tests). */
+export const PANEL_ORDER: Category[] = [
+  'Glucose', 'Lipid', 'LFT', 'KFT', 'Thyroid', 'CBC', 'Vitamins', 'Iron', 'Inflammation',
+];
+
+// Attach direction + core to every biomarker so they're first-class fields.
+for (const b of BIOMARKERS) {
+  b.direction = DIRECTION[b.code] ?? 'in-band-better';
+  b.core = CORE_CODES.has(b.code);
+}
 
 /** Collapse case, whitespace, and stray punctuation for alias matching. */
 export function normalizeName(raw: string): string {

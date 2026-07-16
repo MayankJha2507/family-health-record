@@ -49,16 +49,18 @@ export default async function Home() {
       {profiles && profiles.length > 0 ? (
         <div className="card" style={{ padding: 'var(--sp-2)' }}>
           {profiles.map((p, i) => (
-            <div
+            <Link
               key={p.id}
-              className="between"
+              href={`/profiles/${p.id}`}
+              className="between profile-link"
               style={{ padding: 'var(--sp-3) var(--sp-4)', borderTop: i ? '1px solid var(--border)' : 'none' }}
             >
               <div>
                 <strong>{p.name}</strong>
                 {p.relation && <span className="muted small"> · {p.relation}</span>}
               </div>
-            </div>
+              <span className="link small">View trends →</span>
+            </Link>
           ))}
         </div>
       ) : (
