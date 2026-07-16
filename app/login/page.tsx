@@ -22,9 +22,9 @@ export default function LoginPage() {
 
   return (
     <main className="container" style={{ maxWidth: 460, paddingTop: 'var(--sp-8)' }}>
-      <div className="eyebrow">Family health record</div>
-      <h1>Longitudinal blood-test tracking</h1>
-      <p className="muted">Sign in to manage your family&apos;s lab results.</p>
+      <div className="eyebrow">Family Vitals</div>
+      <h1>Your family&apos;s lab results, in one place</h1>
+      <p className="muted">Sign in with a secure magic link — no password to remember.</p>
       {sent ? (
         <div className="card">Check your email for a secure sign-in link.</div>
       ) : (

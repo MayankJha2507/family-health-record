@@ -31,10 +31,15 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isAuthRoute = path.startsWith('/login') || path.startsWith('/auth');
+  const isAuthRoute =
+    path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/api/dev');
   if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    // Dev-only bypass: auto-sign-in a local user instead of showing the login page.
+    url.pathname =
+      process.env.DEV_AUTH_BYPASS === 'true' && process.env.NODE_ENV !== 'production'
+        ? '/api/dev/login'
+        : '/login';
     return NextResponse.redirect(url);
   }
 

@@ -30,7 +30,7 @@ export default async function Home() {
     <main className="container">
       <div className="between" style={{ marginBottom: 'var(--sp-6)' }}>
         <div>
-          <div className="eyebrow">Family health record</div>
+          <div className="eyebrow">Family Vitals</div>
           <h1>Your family</h1>
           <p className="muted small">Signed in as {user.email}</p>
         </div>
@@ -103,7 +103,7 @@ export default async function Home() {
         <h3 style={{ marginTop: 0 }}>Add a family member</h3>
         <label className="field">
           <span className="label">Name</span>
-          <input className="input" name="name" required placeholder="e.g. Manju Jha" />
+          <input className="input" name="name" required placeholder="e.g. Priya Sharma" />
         </label>
         <div className="row" style={{ alignItems: 'flex-end', gap: 'var(--sp-3)' }}>
           <label className="field" style={{ flex: 1, marginBottom: 0 }}>
