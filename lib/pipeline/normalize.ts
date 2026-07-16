@@ -11,6 +11,7 @@ import {
   BIOMARKERS,
   UNIT_CONVERSIONS,
   resolveBiomarker,
+  getBiomarker,
   normalizeName,
   type Biomarker,
 } from '../biomarkers/dictionary';
@@ -170,3 +171,62 @@ export function normalizeExtraction(raw: RawExtraction): NormalizedResult[] {
 
 /** Codes known to the dictionary — handy for eval and UI. */
 export const KNOWN_CODES = new Set(BIOMARKERS.map((b) => b.code));
+
+/** A row the user has reviewed/edited on the review screen, ready to commit. */
+export interface EditedRow {
+  biomarker_id: string | null; // canonical code chosen by the user, or null (untracked)
+  raw_name: string;
+  value: number | null;
+  unit: string | null;
+  ref_low: number | null;
+  ref_high: number | null;
+  ref_text: string | null;
+  entered_manually: boolean;
+}
+
+/** The deterministic fields a results row carries, derived from an edited row. */
+export interface DerivedResultFields {
+  canonical_value: number | null;
+  canonical_unit: string | null;
+  ref_low: number | null;
+  ref_high: number | null;
+  flag: Flag | null;
+}
+
+/**
+ * Same "code calculates" derivation as the pipeline, but from a USER-edited row.
+ * Used by the review-screen confirm step so committed values are computed by
+ * code, never trusted from the client. Keeps pipeline and confirm in lockstep.
+ */
+export function deriveResultFields(row: EditedRow): DerivedResultFields {
+  const bm = row.biomarker_id ? getBiomarker(row.biomarker_id) : undefined;
+
+  // Effective reference bounds: printed pair wins; else parse single-bound text.
+  let refLow = row.ref_low;
+  let refHigh = row.ref_high;
+  if (refLow == null && refHigh == null && row.ref_text) {
+    const parsed = parseRefText(row.ref_text);
+    if (parsed) {
+      refLow = parsed.ref_low;
+      refHigh = parsed.ref_high;
+    }
+  }
+
+  let canonical_value: number | null = null;
+  let canonical_unit: string | null = null;
+  if (bm && row.value != null) {
+    const c = toCanonical(bm, row.value, row.unit);
+    canonical_value = c.value;
+    canonical_unit = c.unit;
+  } else if (bm) {
+    canonical_unit = bm.canonical_unit;
+  }
+
+  return {
+    canonical_value,
+    canonical_unit,
+    ref_low: refLow,
+    ref_high: refHigh,
+    flag: computeFlag(row.value, refLow, refHigh),
+  };
+}
