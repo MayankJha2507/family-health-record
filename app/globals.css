@@ -211,6 +211,13 @@ label.field { display: block; margin-bottom: var(--sp-3); }
 .review-tr:first-of-type { border-top: 0; }
 
 .stack-tight > * + * { margin-top: 5px; }
+
+/* Read-only review: disabled inputs render as plain text (scoped to review view). */
+.ro-view .input:disabled, .ro-view .select:disabled {
+  background: transparent; border-color: transparent; color: var(--text);
+  opacity: 1; cursor: default; padding-left: 2px; -webkit-text-fill-color: var(--text);
+}
+.ro-view .select:disabled { appearance: none; }
 .input-sm, .select-sm { padding: 0.4rem 0.5rem; font-size: var(--fs-sm); border-radius: 6px; }
 .btn-sm { padding: 0.45rem 0.8rem; font-size: var(--fs-sm); }
 .row-remove {

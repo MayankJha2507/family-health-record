@@ -40,20 +40,42 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
     pdfUrl = signed?.signedUrl ?? null;
   }
 
-  // Normalize the draft transcription into editable rows.
-  const raw = (report.raw_extraction ?? { results: [] }) as RawExtraction;
-  const normalized = normalizeExtraction(raw);
-  const rows: ReviewRow[] = normalized.map((r) => ({
-    biomarker_id: r.biomarker_id,
-    raw_name: r.raw_name,
-    value: r.value,
-    unit: r.unit,
-    ref_low: r.ref_low,
-    ref_high: r.ref_high,
-    ref_text: r.ref_text,
-    flag: r.flag,
-    entered_manually: false,
-  }));
+  // Seed the editable table from the SOURCE OF TRUTH for edits:
+  //  - if this report was already confirmed, load the user's CONFIRMED results
+  //    (preserves corrections — re-review must NEVER silently revert to the raw
+  //    draft; that would overwrite a fix on re-confirm);
+  //  - only on first review (no results yet) seed from the raw extraction.
+  const { data: existing } = await supabase
+    .from('results')
+    .select('raw_name, value, unit, ref_low, ref_high, ref_text, flag, entered_manually, biomarkers(code)')
+    .eq('report_id', id)
+    .order('created_at', { ascending: true });
+
+  const alreadyConfirmed = (existing?.length ?? 0) > 0;
+
+  const rows: ReviewRow[] = alreadyConfirmed
+    ? existing!.map((r) => ({
+        biomarker_id: (r.biomarkers as { code?: string } | null)?.code ?? null,
+        raw_name: r.raw_name,
+        value: r.value,
+        unit: r.unit,
+        ref_low: r.ref_low,
+        ref_high: r.ref_high,
+        ref_text: r.ref_text,
+        flag: r.flag,
+        entered_manually: r.entered_manually,
+      }))
+    : normalizeExtraction((report.raw_extraction ?? { results: [] }) as RawExtraction).map((r) => ({
+        biomarker_id: r.biomarker_id,
+        raw_name: r.raw_name,
+        value: r.value,
+        unit: r.unit,
+        ref_low: r.ref_low,
+        ref_high: r.ref_high,
+        ref_text: r.ref_text,
+        flag: r.flag,
+        entered_manually: false,
+      }));
 
   const dictionary = BIOMARKERS.map((b) => ({
     code: b.code,
@@ -63,14 +85,16 @@ export default async function ReviewPage({ params }: { params: Promise<{ id: str
   }));
 
   const profileName = (report.profiles as { name?: string } | null)?.name ?? '';
+  const rawMeta = (report.raw_extraction ?? {}) as RawExtraction;
 
   return (
     <ReviewClient
       reportId={report.id}
       profileName={profileName}
       status={report.status}
-      labName={report.lab_name ?? raw.lab_name ?? ''}
-      collectedAt={report.collected_at ?? raw.collected_at ?? ''}
+      alreadyConfirmed={alreadyConfirmed}
+      labName={report.lab_name ?? rawMeta.lab_name ?? ''}
+      collectedAt={report.collected_at ?? rawMeta.collected_at ?? ''}
       pdfUrl={pdfUrl}
       initialRows={rows}
       dictionary={dictionary}

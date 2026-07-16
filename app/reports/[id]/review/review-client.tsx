@@ -38,6 +38,7 @@ export function ReviewClient(props: {
   reportId: string;
   profileName: string;
   status: string;
+  alreadyConfirmed: boolean;
   labName: string;
   collectedAt: string;
   pdfUrl: string | null;
@@ -49,6 +50,10 @@ export function ReviewClient(props: {
   const [collectedAt, setCollectedAt] = useState(props.collectedAt);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  // Confirmed reports open READ-ONLY (seeded from the confirmed results, not the
+  // raw draft) — editing is a deliberate act, so re-review can't silently revert.
+  const [editing, setEditing] = useState(!props.alreadyConfirmed);
+  const ro = !editing;
 
   const dictByCode = new Map(props.dictionary.map((d) => [d.code, d]));
 
@@ -100,7 +105,9 @@ export function ReviewClient(props: {
           <div className="eyebrow">Review &amp; confirm</div>
           <h1 style={{ marginBottom: 2 }}>{props.profileName ? `${props.profileName}'s report` : 'Review report'}</h1>
           <p className="muted small" style={{ margin: 0 }}>
-            Check the extracted values against the PDF. Nothing is saved to the health record until you confirm.
+            {props.alreadyConfirmed && ro
+              ? 'Confirmed. These are the values saved to the record — edit only if you need to correct one.'
+              : 'Check the extracted values against the PDF. Nothing is saved to the health record until you confirm.'}
           </p>
         </div>
         <Link href="/" className="link">← Family</Link>
@@ -117,19 +124,19 @@ export function ReviewClient(props: {
         </div>
 
         {/* Editable draft */}
-        <div>
+        <div className={ro ? 'ro-view' : undefined}>
           <div className="card stack" style={{ marginBottom: 'var(--sp-4)' }}>
             <div className="row" style={{ gap: 'var(--sp-4)', alignItems: 'flex-end' }}>
               <label className="field" style={{ flex: 1, marginBottom: 0 }}>
                 <span className="label">Collection date <span style={{ color: 'var(--flag-high)' }}>*</span></span>
-                <input className="input" type="date" value={collectedAt} onChange={(e) => setCollectedAt(e.target.value)} />
+                <input className="input" type="date" value={collectedAt} disabled={ro} onChange={(e) => setCollectedAt(e.target.value)} />
                 <span className="small faint" style={{ display: 'block', marginTop: 4 }}>
                   Determines this report&apos;s place on the trend — not the upload order.
                 </span>
               </label>
               <label className="field" style={{ flex: 1, marginBottom: 0 }}>
                 <span className="label">Lab</span>
-                <input className="input" value={labName} onChange={(e) => setLabName(e.target.value)} placeholder="e.g. Thyrocare" />
+                <input className="input" value={labName} disabled={ro} onChange={(e) => setLabName(e.target.value)} placeholder="e.g. Thyrocare" />
               </label>
             </div>
           </div>
@@ -153,12 +160,14 @@ export function ReviewClient(props: {
                     <input
                       className="input input-sm"
                       value={r.raw_name}
+                      disabled={ro}
                       placeholder="Test name (as printed)"
                       onChange={(e) => update(i, { raw_name: e.target.value })}
                     />
                     <select
                       className="select select-sm"
                       value={r.biomarker_id ?? ''}
+                      disabled={ro}
                       onChange={(e) => {
                         const code = e.target.value || null;
                         const d = code ? dictByCode.get(code) : undefined;
@@ -179,12 +188,14 @@ export function ReviewClient(props: {
                       style={{ width: 74 }}
                       inputMode="decimal"
                       value={r.value ?? ''}
+                      disabled={ro}
                       onChange={(e) => update(i, { value: numOrNull(e.target.value) })}
                     />
                     <input
                       className="input input-sm"
                       style={{ width: 66 }}
                       value={r.unit ?? ''}
+                      disabled={ro}
                       placeholder={dict?.canonical_unit ?? 'unit'}
                       onChange={(e) => update(i, { unit: e.target.value || null })}
                     />
@@ -192,26 +203,30 @@ export function ReviewClient(props: {
 
                   <div className="row" style={{ gap: 4 }}>
                     <input
-                      className="input input-sm numeric" style={{ width: 58 }} placeholder="low"
+                      className="input input-sm numeric" style={{ width: 58 }} placeholder="low" disabled={ro}
                       value={r.ref_low ?? ''} onChange={(e) => update(i, { ref_low: numOrNull(e.target.value) })}
                     />
                     <span className="faint">–</span>
                     <input
-                      className="input input-sm numeric" style={{ width: 58 }} placeholder="high"
+                      className="input input-sm numeric" style={{ width: 58 }} placeholder="high" disabled={ro}
                       value={r.ref_high ?? ''} onChange={(e) => update(i, { ref_high: numOrNull(e.target.value) })}
                     />
                   </div>
 
                   <div>{flag ? <span className={`flag ${flag}`}>{flag}</span> : <span className="faint small">—</span>}</div>
 
-                  <button type="button" className="row-remove" onClick={() => removeRow(i)} aria-label="Remove row">×</button>
+                  {editing ? (
+                    <button type="button" className="row-remove" onClick={() => removeRow(i)} aria-label="Remove row">×</button>
+                  ) : <span />}
                 </div>
               );
             })}
 
-            <div style={{ padding: 'var(--sp-3) var(--sp-4)' }}>
-              <button type="button" className="btn btn-secondary btn-sm" onClick={addRow}>+ Add a row / manual entry</button>
-            </div>
+            {editing && (
+              <div style={{ padding: 'var(--sp-3) var(--sp-4)' }}>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={addRow}>+ Add a row / manual entry</button>
+              </div>
+            )}
           </div>
 
           <div className="between" style={{ marginTop: 'var(--sp-4)' }}>
@@ -219,9 +234,13 @@ export function ReviewClient(props: {
               {rows.length} row(s) · {trackedCount} tracked ·{' '}
               {rows.length - trackedCount} not tracked
             </span>
-            <button type="button" className="btn" onClick={onConfirm} disabled={pending}>
-              {pending ? 'Saving…' : 'Confirm & save to record'}
-            </button>
+            {ro ? (
+              <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>Edit values</button>
+            ) : (
+              <button type="button" className="btn" onClick={onConfirm} disabled={pending}>
+                {pending ? 'Saving…' : props.alreadyConfirmed ? 'Save changes' : 'Confirm & save to record'}
+              </button>
+            )}
           </div>
           {error && <p className="small" style={{ color: 'var(--flag-high)', textAlign: 'right' }}>{error}</p>}
         </div>
