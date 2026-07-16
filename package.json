@@ -9,6 +9,7 @@
     "lint": "next lint",
     "test:rls": "node --import tsx test/rls.test.ts",
     "test:storage-rls": "node --import tsx test/storage-rls.test.ts",
+    "test:pipeline-e2e": "node --import tsx test/pipeline-e2e.test.ts",
     "eval": "node --import tsx eval/run.ts",
     "gen:seed": "node --import tsx scripts/gen-seed.ts"
   },

@@ -21,23 +21,29 @@ export default function LoginPage() {
   }
 
   return (
-    <main>
-      <h1>Family Longitudinal Health Record</h1>
+    <main className="container" style={{ maxWidth: 460, paddingTop: 'var(--sp-8)' }}>
+      <div className="eyebrow">Family health record</div>
+      <h1>Longitudinal blood-test tracking</h1>
       <p className="muted">Sign in to manage your family&apos;s lab results.</p>
       {sent ? (
-        <div className="card">Check your email for a sign-in link.</div>
+        <div className="card">Check your email for a secure sign-in link.</div>
       ) : (
-        <form className="card" onSubmit={sendLink}>
-          <input
-            type="email"
-            required
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            style={{ width: '100%', marginBottom: '0.75rem' }}
-          />
-          <button type="submit">Send magic link</button>
-          {error && <p style={{ color: '#b3261e' }}>{error}</p>}
+        <form className="card stack" onSubmit={sendLink}>
+          <label className="field" style={{ marginBottom: 0 }}>
+            <span className="label">Email</span>
+            <input
+              className="input"
+              type="email"
+              required
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </label>
+          <div>
+            <button className="btn" type="submit">Send magic link</button>
+          </div>
+          {error && <p className="small" style={{ color: 'var(--flag-high)', margin: 0 }}>{error}</p>}
         </form>
       )}
     </main>

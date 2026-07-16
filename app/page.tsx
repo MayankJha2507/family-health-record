@@ -1,11 +1,15 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { createProfile, signOut } from './actions';
 
-/**
- * Family dashboard. The profiles query carries no WHERE clause — RLS scopes it
- * to the signed-in owner. That's the Phase 0 contract, exercised in the UI.
- */
+const STATUS_LABEL: Record<string, string> = {
+  processing: 'Processing',
+  needs_review: 'Ready to review',
+  confirmed: 'Confirmed',
+  failed: 'Failed',
+};
+
 export default async function Home() {
   const supabase = await createClient();
   const {
@@ -13,48 +17,116 @@ export default async function Home() {
   } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, name, relation, dob, sex')
-    .order('created_at', { ascending: true });
+  const [{ data: profiles }, { data: reports }] = await Promise.all([
+    supabase.from('profiles').select('id, name, relation').order('created_at', { ascending: true }),
+    supabase
+      .from('reports')
+      .select('id, status, lab_name, collected_at, created_at, profiles(name)')
+      .order('created_at', { ascending: false })
+      .limit(10),
+  ]);
 
   return (
-    <main>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <h1>Your family</h1>
+    <main className="container">
+      <div className="between" style={{ marginBottom: 'var(--sp-6)' }}>
+        <div>
+          <div className="eyebrow">Family health record</div>
+          <h1>Your family</h1>
+          <p className="muted small">Signed in as {user.email}</p>
+        </div>
         <form action={signOut}>
-          <button type="submit" style={{ background: 'transparent', color: 'var(--muted)', borderColor: 'var(--border)' }}>
-            Sign out
-          </button>
+          <button type="submit" className="btn-ghost btn">Sign out</button>
         </form>
       </div>
-      <p className="muted">Signed in as {user.email}</p>
+
+      <div className="between" style={{ marginBottom: 'var(--sp-3)' }}>
+        <h2 style={{ margin: 0 }}>Members</h2>
+        {profiles && profiles.length > 0 && (
+          <Link href="/upload" className="btn">Upload a report</Link>
+        )}
+      </div>
 
       {profiles && profiles.length > 0 ? (
-        profiles.map((p) => (
-          <div key={p.id} className="card">
-            <strong>{p.name}</strong>
-            {p.relation && <span className="muted"> · {p.relation}</span>}
-          </div>
-        ))
+        <div className="card" style={{ padding: 'var(--sp-2)' }}>
+          {profiles.map((p, i) => (
+            <div
+              key={p.id}
+              className="between"
+              style={{ padding: 'var(--sp-3) var(--sp-4)', borderTop: i ? '1px solid var(--border)' : 'none' }}
+            >
+              <div>
+                <strong>{p.name}</strong>
+                {p.relation && <span className="muted small"> · {p.relation}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <p className="muted">No family members yet. Add your first below.</p>
       )}
 
-      <form action={createProfile} className="card" style={{ marginTop: '1.5rem' }}>
-        <h2 style={{ fontSize: '1rem', marginTop: 0 }}>Add a family member</h2>
-        <input name="name" required placeholder="Name" style={{ width: '100%', marginBottom: '0.5rem' }} />
-        <input name="relation" placeholder="Relation (e.g. mother, self)" style={{ width: '100%', marginBottom: '0.5rem' }} />
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.5rem' }}>
-          <input name="dob" type="date" style={{ flex: 1 }} />
-          <select name="sex" style={{ flex: 1, padding: '0.55rem', borderRadius: 8, border: '1px solid var(--border)' }}>
-            <option value="">Sex…</option>
-            <option value="female">Female</option>
-            <option value="male">Male</option>
-            <option value="other">Other</option>
-          </select>
+      {reports && reports.length > 0 && (
+        <>
+          <h2 style={{ marginTop: 'var(--sp-6)' }}>Recent reports</h2>
+          <div className="card" style={{ padding: 'var(--sp-2)' }}>
+            {reports.map((r, i) => {
+              const profileName = (r.profiles as { name?: string } | null)?.name ?? '—';
+              return (
+                <div
+                  key={r.id}
+                  className="between"
+                  style={{ padding: 'var(--sp-3) var(--sp-4)', borderTop: i ? '1px solid var(--border)' : 'none' }}
+                >
+                  <div>
+                    <strong>{r.lab_name ?? 'Blood test'}</strong>
+                    <span className="muted small"> · {profileName}</span>
+                    <div className="faint small numeric">
+                      {r.collected_at ?? new Date(r.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div className="row">
+                    <span className={`pill ${r.status}`}><span className="dot" />{STATUS_LABEL[r.status] ?? r.status}</span>
+                    {r.status === 'needs_review' && (
+                      <Link href={`/reports/${r.id}/review`} className="link small">Review →</Link>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
+
+      <hr className="divider" />
+
+      <form action={createProfile} className="card stack">
+        <h3 style={{ marginTop: 0 }}>Add a family member</h3>
+        <label className="field">
+          <span className="label">Name</span>
+          <input className="input" name="name" required placeholder="e.g. Manju Jha" />
+        </label>
+        <div className="row" style={{ alignItems: 'flex-end', gap: 'var(--sp-3)' }}>
+          <label className="field" style={{ flex: 1, marginBottom: 0 }}>
+            <span className="label">Relation</span>
+            <input className="input" name="relation" placeholder="mother, self…" />
+          </label>
+          <label className="field" style={{ flex: 1, marginBottom: 0 }}>
+            <span className="label">Date of birth</span>
+            <input className="input" name="dob" type="date" />
+          </label>
+          <label className="field" style={{ flex: 1, marginBottom: 0 }}>
+            <span className="label">Sex</span>
+            <select className="select" name="sex" defaultValue="">
+              <option value="">—</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
         </div>
-        <button type="submit">Add member</button>
+        <div>
+          <button className="btn" type="submit">Add member</button>
+        </div>
       </form>
     </main>
   );
