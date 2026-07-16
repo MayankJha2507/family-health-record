@@ -16,6 +16,7 @@ export interface ResultRow {
   unit: string | null;
   ref_low: number | null;
   ref_high: number | null;
+  ref_text: string | null;
   flag: string | null;
   measured_at: string; // yyyy-mm-dd
 }
@@ -25,6 +26,7 @@ export interface TrendPoint {
   value: number | null;
   ref_low: number | null;
   ref_high: number | null;
+  ref_text: string | null;
   flag: string | null;
 }
 
@@ -114,6 +116,7 @@ export function buildProfileTrends(rows: ResultRow[], totalConfirmedReports: num
         value: r.canonical_value,
         ref_low: r.ref_low,
         ref_high: r.ref_high,
+        ref_text: r.ref_text,
         flag: r.flag,
       }))
       .sort((a, b) => a.date.localeCompare(b.date));

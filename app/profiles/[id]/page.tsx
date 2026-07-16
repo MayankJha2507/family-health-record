@@ -29,7 +29,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
   // Confirmed results only (health facts), newest report metadata for the count.
   const { data: rowsRaw } = await supabase
     .from('results')
-    .select('raw_name, value, canonical_value, canonical_unit, unit, ref_low, ref_high, flag, measured_at, biomarkers(code)')
+    .select('raw_name, value, canonical_value, canonical_unit, unit, ref_low, ref_high, ref_text, flag, measured_at, biomarkers(code)')
     .eq('profile_id', id)
     .order('measured_at', { ascending: true });
 
@@ -38,6 +38,12 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
     .select('id', { count: 'exact', head: true })
     .eq('profile_id', id)
     .eq('status', 'confirmed');
+
+  const { data: reportList } = await supabase
+    .from('reports')
+    .select('id, lab_name, collected_at, status')
+    .eq('profile_id', id)
+    .order('collected_at', { ascending: false, nullsFirst: false });
 
   const rows: ResultRow[] = (rowsRaw ?? []).map((r) => ({
     code: (r.biomarkers as { code?: string } | null)?.code ?? null,
@@ -48,6 +54,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
     unit: r.unit,
     ref_low: r.ref_low,
     ref_high: r.ref_high,
+    ref_text: r.ref_text,
     flag: r.flag,
     measured_at: r.measured_at,
   }));
@@ -70,6 +77,18 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
           <Link href="/" className="link">← Family</Link>
         </div>
       </div>
+
+      {reportList && reportList.length > 0 && (
+        <div className="reports-strip" style={{ marginBottom: 'var(--sp-5)' }}>
+          <span className="small muted" style={{ marginRight: 'var(--sp-1)' }}>Reports:</span>
+          {reportList.map((r) => (
+            <Link key={r.id} href={`/reports/${r.id}/review`} className={`report-chip ${r.status}`}>
+              <span className="numeric">{r.collected_at ?? 'undated'}</span>
+              <span className="faint"> · {r.lab_name ?? 'lab'}</span>
+            </Link>
+          ))}
+        </div>
+      )}
 
       {rows.length === 0 ? (
         <div className="card">

@@ -7,11 +7,16 @@ import type { MarkerSeries, ProfileTrends } from '@/lib/trends/build';
 const fmt = (n: number | null) => (n == null ? '—' : Number.isInteger(n) ? String(n) : String(n));
 const shortDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
 
-function rangeText(low: number | null, high: number | null): string {
+function rangeText(low: number | null, high: number | null, refText?: string | null): string {
   if (low != null && high != null) return `${low}–${high}`;
   if (high != null) return `< ${high}`;
   if (low != null) return `> ${low}`;
-  return '—';
+  // Fall back to the lab's printed range text (e.g. HbA1c bands), shortened.
+  if (refText && refText.trim()) {
+    const t = refText.trim();
+    return t.length > 22 ? t.slice(0, 21) + '…' : t;
+  }
+  return 'no range';
 }
 
 /* ---------- sparkline ---------- */
@@ -101,14 +106,18 @@ function MarkerRow({ series, tone, showChange }: { series: MarkerSeries; tone: '
         <div className="marker-val numeric">
           {fmt(series.latest.value)} <span className="faint">{series.unit}</span>
         </div>
-        <div className="marker-range numeric faint small">{rangeText(series.latest.ref_low, series.latest.ref_high)}</div>
+        <div className="marker-range numeric faint small" title={series.latest.ref_text ?? undefined}>
+          {rangeText(series.latest.ref_low, series.latest.ref_high, series.latest.ref_text)}
+        </div>
         <div className="marker-flag">
           {series.abnormal ? (
             <span className={`flag ${series.latest.flag}`}>{series.latest.flag}</span>
           ) : showChange && series.changed && dir ? (
             <span className={`chg chg-${tone}`}>{dir} {Math.abs(series.changePct!).toFixed(0)}%</span>
-          ) : (
+          ) : series.latest.flag === 'normal' ? (
             <span className="flag normal">in range</span>
+          ) : (
+            <span className="chg chg-neutral">recorded</span>
           )}
         </div>
         <div className="marker-spark">

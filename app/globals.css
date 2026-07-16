@@ -228,6 +228,16 @@ label.field { display: block; margin-bottom: var(--sp-3); }
 .profile-link { text-decoration: none; color: inherit; display: flex; }
 .profile-link:hover { background: var(--surface-2); }
 
+.reports-strip { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); }
+.report-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  font-size: var(--fs-sm); text-decoration: none; color: var(--text);
+  padding: 0.35rem 0.7rem; border: 1px solid var(--border-strong);
+  border-radius: 999px; background: var(--surface); transition: border-color 0.15s, background 0.15s;
+}
+.report-chip:hover { border-color: var(--accent); background: var(--accent-soft); }
+.report-chip.needs_review { border-color: #e6c98a; background: var(--flag-low-bg); }
+
 /* ---- Trends / profile view ---- */
 .trend-section { padding: 0; overflow: hidden; }
 .trend-section.attention { border-color: #f0d9b8; }

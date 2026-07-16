@@ -21,7 +21,7 @@ export default async function Home() {
     supabase.from('profiles').select('id, name, relation').order('created_at', { ascending: true }),
     supabase
       .from('reports')
-      .select('id, status, lab_name, collected_at, created_at, profiles(name)')
+      .select('id, profile_id, status, lab_name, collected_at, created_at, profiles(name)')
       .order('created_at', { ascending: false })
       .limit(10),
   ]);
@@ -73,10 +73,12 @@ export default async function Home() {
           <div className="card" style={{ padding: 'var(--sp-2)' }}>
             {reports.map((r, i) => {
               const profileName = (r.profiles as { name?: string } | null)?.name ?? '—';
+              const href = r.status === 'needs_review' ? `/reports/${r.id}/review` : `/profiles/${r.profile_id}`;
               return (
-                <div
+                <Link
                   key={r.id}
-                  className="between"
+                  href={href}
+                  className="between profile-link"
                   style={{ padding: 'var(--sp-3) var(--sp-4)', borderTop: i ? '1px solid var(--border)' : 'none' }}
                 >
                   <div>
@@ -88,11 +90,9 @@ export default async function Home() {
                   </div>
                   <div className="row">
                     <span className={`pill ${r.status}`}><span className="dot" />{STATUS_LABEL[r.status] ?? r.status}</span>
-                    {r.status === 'needs_review' && (
-                      <Link href={`/reports/${r.id}/review`} className="link small">Review →</Link>
-                    )}
+                    <span className="link small">{r.status === 'needs_review' ? 'Review →' : 'View trends →'}</span>
                   </div>
-                </div>
+                </Link>
               );
             })}
           </div>
