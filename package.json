@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "test:rls": "node --import tsx test/rls.test.ts",
+    "test:storage-rls": "node --import tsx test/storage-rls.test.ts",
     "eval": "node --import tsx eval/run.ts",
     "gen:seed": "node --import tsx scripts/gen-seed.ts"
   },
