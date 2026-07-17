@@ -73,6 +73,7 @@ export default async function ProfilePage({ params }: { params: Promise<{ id: st
           </p>
         </div>
         <div className="row" style={{ gap: 'var(--sp-3)' }}>
+          {rows.length > 0 && <Link href={`/profiles/${id}/summary`} className="btn btn-sm">Doctor summary</Link>}
           <Link href="/upload" className="btn btn-secondary btn-sm">Upload a report</Link>
           <Link href="/" className="link">← Family</Link>
         </div>
