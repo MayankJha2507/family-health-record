@@ -31,8 +31,11 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
+  // Public routes (no auth required): login, auth callbacks, dev bypass, and the
+  // standalone marketing landing page.
   const isAuthRoute =
-    path.startsWith('/login') || path.startsWith('/auth') || path.startsWith('/api/dev');
+    path.startsWith('/login') || path.startsWith('/auth') ||
+    path.startsWith('/api/dev') || path.startsWith('/landing');
   if (!user && !isAuthRoute) {
     const url = request.nextUrl.clone();
     // Dev-only bypass: auto-sign-in a local user instead of showing the login page.
