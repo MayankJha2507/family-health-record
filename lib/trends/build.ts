@@ -40,7 +40,9 @@ export interface MarkerSeries {
   points: TrendPoint[]; // ascending by date
   latest: TrendPoint;
   previous: TrendPoint | null;
-  abnormal: boolean; // latest outside the lab's range
+  abnormal: boolean; // latest outside the lab's range (either direction)
+  concerning: boolean; // outside range in the UNFAVOURABLE direction (alarm-worthy)
+  exceedance: 'above' | 'below' | null; // which side of the range, if outside
   changed: boolean; // moved meaningfully since previous
   changePct: number | null; // signed % change latest vs previous
   changeQuality: 'good' | 'bad' | 'neutral' | null;
@@ -66,6 +68,23 @@ const MEANINGFUL_PCT = 10; // ≥10% move counts as "recently changed"
 
 function isAbnormal(flag: string | null): boolean {
   return flag === 'low' || flag === 'high' || flag === 'abnormal';
+}
+
+/**
+ * Whether an out-of-range value is CONCERNING (alarm-worthy) vs merely outside
+ * the range in a favourable direction. This ONLY changes concerning-vs-neutral
+ * presentation — it is never medical advice. E.g. HDL above range (higher is
+ * better) is out of range but not concerning.
+ */
+export function isConcerning(flag: string | null, direction: Direction): boolean {
+  if (flag === 'high') return direction !== 'higher-better'; // high HDL etc. = not a concern
+  if (flag === 'low') return direction !== 'lower-better'; // low LDL etc. = not a concern
+  if (flag === 'abnormal') return true;
+  return false;
+}
+
+function exceedanceOf(flag: string | null): 'above' | 'below' | null {
+  return flag === 'high' ? 'above' : flag === 'low' ? 'below' : null;
 }
 
 /** How near a value sits to the middle of its range (for in-band direction). */
@@ -144,6 +163,8 @@ export function buildProfileTrends(rows: ResultRow[], totalConfirmedReports: num
       latest,
       previous,
       abnormal: isAbnormal(latest.flag),
+      concerning: isConcerning(latest.flag, bm.direction ?? 'in-band-better'),
+      exceedance: exceedanceOf(latest.flag),
       changed,
       changePct,
       changeQuality,
@@ -153,8 +174,10 @@ export function buildProfileTrends(rows: ResultRow[], totalConfirmedReports: num
   // Sort: core first, then by display name — stable, predictable.
   series.sort((a, b) => Number(b.core) - Number(a.core) || a.display_name.localeCompare(b.display_name));
 
-  const attention = series.filter((s) => s.abnormal);
-  const recentlyChanged = series.filter((s) => !s.abnormal && s.changed);
+  // Attention band = only CONCERNING markers (out of range in the unfavourable
+  // direction). A favourable exceedance like high HDL is out of range but calm.
+  const attention = series.filter((s) => s.concerning);
+  const recentlyChanged = series.filter((s) => !s.concerning && s.changed);
 
   // Panels: group ALL tracked series by category, in report order.
   const byPanel = PANEL_ORDER.map((category) => ({

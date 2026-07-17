@@ -293,6 +293,15 @@ label.field { display: block; margin-bottom: var(--sp-3); }
 .chg-bad { color: var(--flag-high); background: var(--flag-high-bg); }
 .chg-neutral { color: var(--text-muted); background: var(--surface-2); }
 
+/* Favourable out-of-range (e.g. high HDL): calm, informational — never alarming,
+   never "good"/advice. Distinct from the red concern flag. */
+.chip-above {
+  display: inline-flex; align-items: center;
+  font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.02em;
+  padding: 0.2rem 0.5rem; border-radius: var(--radius-sm);
+  color: #3f6b8a; background: #eaf1f6; text-transform: capitalize;
+}
+
 .chart-wrap { padding: var(--sp-3) var(--sp-2) var(--sp-2); border-top: 1px dashed var(--border); }
 .chart-val { font-size: 12px; font-weight: 650; fill: var(--text); font-variant-numeric: tabular-nums; }
 .chart-axis { font-size: 10.5px; fill: var(--text-faint); }

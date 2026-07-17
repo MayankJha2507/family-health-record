@@ -1,16 +1,23 @@
 'use client';
 
 import { useState } from 'react';
-import type { MarkerSeries, ProfileTrends } from '@/lib/trends/build';
+import { isConcerning, type MarkerSeries, type ProfileTrends } from '@/lib/trends/build';
 
 /* ---------- small helpers ---------- */
-const fmt = (n: number | null) => (n == null ? '—' : Number.isInteger(n) ? String(n) : String(n));
+/** Round to sensible precision by magnitude, trimming trailing zeros (display only). */
+function displayValue(n: number | null): string {
+  if (n == null) return '—';
+  const a = Math.abs(n);
+  const dec = a >= 10 ? 0 : a >= 1 ? 1 : 2;
+  return String(Number(n.toFixed(dec)));
+}
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const shortDate = (d: string) => new Date(d + 'T00:00:00').toLocaleDateString('en-IN', { month: 'short', year: '2-digit' });
 
 function rangeText(low: number | null, high: number | null, refText?: string | null): string {
-  if (low != null && high != null) return `${low}–${high}`;
-  if (high != null) return `< ${high}`;
-  if (low != null) return `> ${low}`;
+  if (low != null && high != null) return `${displayValue(low)}–${displayValue(high)}`;
+  if (high != null) return `< ${displayValue(high)}`;
+  if (low != null) return `> ${displayValue(low)}`;
   // Fall back to the lab's printed range text (e.g. HbA1c bands), shortened.
   if (refText && refText.trim()) {
     const t = refText.trim();
@@ -74,11 +81,13 @@ function ExpandedChart({ series }: { series: MarkerSeries }) {
         )}
         {/* points + value labels */}
         {pts.map((p, i) => {
-          const abn = p.flag === 'high' || p.flag === 'low' || p.flag === 'abnormal';
+          // Red only when the point is CONCERNING (out of range unfavourably) —
+          // a favourable exceedance like high HDL stays calm/accent-coloured.
+          const concerning = isConcerning(p.flag, series.direction);
           return (
             <g key={i}>
-              <circle cx={x(i)} cy={y(p.value as number)} r="4" fill={abn ? 'var(--flag-high)' : 'var(--accent)'} />
-              <text x={x(i)} y={y(p.value as number) - 9} textAnchor="middle" className="chart-val">{fmt(p.value)}</text>
+              <circle cx={x(i)} cy={y(p.value as number)} r="4" fill={concerning ? 'var(--flag-high)' : 'var(--accent)'} />
+              <text x={x(i)} y={y(p.value as number) - 9} textAnchor="middle" className="chart-val">{displayValue(p.value)}</text>
               <text x={x(i)} y={h - 12} textAnchor="middle" className="chart-axis">{shortDate(p.date)}</text>
             </g>
           );
@@ -104,14 +113,18 @@ function MarkerRow({ series, tone, showChange }: { series: MarkerSeries; tone: '
           {series.display_name}
         </div>
         <div className="marker-val numeric">
-          {fmt(series.latest.value)} <span className="faint">{series.unit}</span>
+          {displayValue(series.latest.value)} <span className="faint">{series.unit}</span>
         </div>
         <div className="marker-range numeric faint small" title={series.latest.ref_text ?? undefined}>
           {rangeText(series.latest.ref_low, series.latest.ref_high, series.latest.ref_text)}
         </div>
         <div className="marker-flag">
-          {series.abnormal ? (
+          {series.concerning ? (
+            // Out of range in the UNFAVOURABLE direction → red concern chip.
             <span className={`flag ${series.latest.flag}`}>{series.latest.flag}</span>
+          ) : series.exceedance ? (
+            // Out of range in a FAVOURABLE direction → calm, neutral chip (not advice).
+            <span className="chip-above">{series.exceedance} range</span>
           ) : showChange && series.changed && dir ? (
             <span className={`chg chg-${tone}`}>{dir} {Math.abs(series.changePct!).toFixed(0)}%</span>
           ) : series.latest.flag === 'normal' ? (
@@ -146,14 +159,15 @@ function Section({ title, subtitle, defaultOpen, children }: { title: string; su
 
 /* ---------- main view ---------- */
 export function TrendsView({ trends }: { trends: ProfileTrends }) {
+  const favourableOutOfRange = trends.series.filter((s) => !s.concerning && s.abnormal);
   return (
     <div className="stack">
-      {/* 1. Attention */}
+      {/* 1. Attention — concerning markers only */}
       {trends.attention.length > 0 ? (
         <div className="card trend-section attention">
           <div className="section-head static">
             <span className="section-title">Worth a closer look</span>
-            <span className="section-sub muted small">{trends.attention.length} outside the lab&apos;s range</span>
+            <span className="section-sub muted small">{plural(trends.attention.length, 'marker')} to discuss</span>
           </div>
           <div className="section-body">
             {trends.attention.map((s) => <MarkerRow key={s.code} series={s} tone="neutral" showChange={false} />)}
@@ -164,7 +178,10 @@ export function TrendsView({ trends }: { trends: ProfileTrends }) {
         </div>
       ) : (
         <div className="card all-clear">
-          <span className="all-clear-dot" /> All values are within your lab&apos;s ranges.
+          <span className="all-clear-dot" />
+          {favourableOutOfRange.length > 0
+            ? 'Nothing concerning — every value is in range or outside it in a favourable direction.'
+            : 'All values are within your lab’s ranges.'}
         </div>
       )}
 
@@ -179,8 +196,11 @@ export function TrendsView({ trends }: { trends: ProfileTrends }) {
 
       {/* 3. By panel (collapsed) */}
       {trends.byPanel.map((panel) => {
-        const abn = panel.markers.filter((m) => m.abnormal).length;
-        const summary = abn > 0 ? `${panel.markers.length} markers · ${abn} to review` : `${panel.markers.length} markers · all in range`;
+        const outside = panel.markers.filter((m) => m.abnormal).length;
+        const summary =
+          outside > 0
+            ? `${plural(panel.markers.length, 'marker')} · ${outside} outside range`
+            : `${plural(panel.markers.length, 'marker')} · all in range`;
         return (
           <Section key={panel.category} title={panel.category} subtitle={summary} defaultOpen={false}>
             <div className="marker-head">
@@ -200,7 +220,7 @@ export function TrendsView({ trends }: { trends: ProfileTrends }) {
           {trends.untracked.map((u, i) => (
             <div className="marker-row" key={i}>
               <div className="marker-name">{u.raw_name}</div>
-              <div className="marker-val numeric">{fmt(u.value)} <span className="faint">{u.unit ?? ''}</span></div>
+              <div className="marker-val numeric">{displayValue(u.value)} <span className="faint">{u.unit ?? ''}</span></div>
               <div /><div /><div className="faint small">{shortDate(u.date)}</div>
             </div>
           ))}
